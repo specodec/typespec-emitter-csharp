@@ -1,0 +1,29 @@
+{
+  "name": "@specodec/typespec-emitter-core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "tspMain": "lib/main.tsp",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./lib/main.tsp": "./lib/main.tsp"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@typespec/compiler": "1.11.0",
+    "typescript": "~5.6.0"
+  },
+  "files": [
+    "dist/**",
+    "src/**",
+    "lib/**"
+  ]
+}

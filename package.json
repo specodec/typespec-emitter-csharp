@@ -1,0 +1,37 @@
+{
+  "name": "@specodec/typespec-emitter-csharp",
+  "main": "dist/index.js",
+  "version": "0.1.0",
+  "type": "module",
+  "typespec": {
+    "emitter": true,
+    "options": {
+      "@specodec/typespec-emitter-csharp": {
+        "type": "object",
+        "properties": {
+          "emitter-output-dir": {
+            "type": "string"
+          },
+          "ignore-reserved-keywords": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "emitter-output-dir"
+        ]
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "@specodec/typespec-emitter-core": "0.1.0"
+  },
+  "devDependencies": {
+    "@typespec/compiler": "^1.11.0",
+    "@typespec/http": "1.11.0",
+    "typescript": "^5.8.0"
+  }
+}
