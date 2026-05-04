@@ -99,7 +99,8 @@ function writeExpr(expr: string, type: Type, w: string): string {
     switch (n) {
       case "string": return `${w}.WriteString(${expr});`;
       case "boolean": return `${w}.WriteBool(${expr});`;
-      case "int8": case "int16": return `${w}.WriteInt32(${expr});`;
+      case "int8": return `${w}.WriteInt32((sbyte)${expr});`;
+      case "int16": return `${w}.WriteInt32(${expr});`;
       case "int32": case "integer": return `${w}.WriteInt32(${expr});`;
       case "int64": return `${w}.WriteInt64(${expr});`;
       case "uint8": case "uint16": return `${w}.WriteUint32(${expr});`;
@@ -155,17 +156,17 @@ function readExpr(type: Type, r: string, optional?: boolean): string {
 function generateModelCode(m: Model, pkg: string): string {
   const fields = extractFields(m);
   const optionalFields = fields.filter(f => f.optional);
-  const requiredFields = fields.filter(f => !f.optional);
-  const orderedFields = [...requiredFields, ...optionalFields];
+  const requiredCount = fields.filter(f => !f.optional).length;
+  const recordFields = [...fields.filter(f => !f.optional), ...fields.filter(f => f.optional)];
   const lines: string[] = [];
 
   if (fields.length === 0) {
     lines.push(`public record ${m.name};`);
   } else {
     lines.push(`public record ${m.name}(`);
-    for (let i = 0; i < orderedFields.length; i++) {
-      const f = orderedFields[i];
-      const comma = i < orderedFields.length - 1 ? "," : "";
+    for (let i = 0; i < recordFields.length; i++) {
+      const f = recordFields[i];
+      const comma = i < recordFields.length - 1 ? "," : "";
       if (f.optional) {
         lines.push(`    ${typeToCsharp(f.type)}? ${toPascalCase(f.name)} = null${comma}`);
       } else {
@@ -179,7 +180,7 @@ function generateModelCode(m: Model, pkg: string): string {
   lines.push(`public static class ${m.name}Methods {`);
   lines.push(`public static void Write${m.name}(SpecWriter w, ${m.name} obj) {`);
   if (optionalFields.length > 0) {
-    lines.push(`    var _n = ${requiredFields.length};`);
+    lines.push(`    var _n = ${requiredCount};`);
     for (const f of optionalFields) {
       const fname = toPascalCase(f.name);
       lines.push(`    if (obj.${fname} != null) _n++;`);
@@ -188,7 +189,7 @@ function generateModelCode(m: Model, pkg: string): string {
   } else {
     lines.push(`    w.BeginObject(${fields.length});`);
   }
-  for (const f of orderedFields) {
+  for (const f of fields) {
     const fname = toPascalCase(f.name);
     if (f.optional) {
       const valExpr = isCSharpValueType(f.type) ? `obj.${fname}.Value` : `obj.${fname}`;
@@ -204,7 +205,7 @@ function generateModelCode(m: Model, pkg: string): string {
   lines.push(`public static readonly SpecCodec<${m.name}> ${m.name}Codec = new(`);
   lines.push(`    Encode: (w, obj) => Write${m.name}(w, obj),`);
   lines.push(`    Decode: r => {`);
-  for (const f of orderedFields) {
+  for (const f of fields) {
     const fname = toPascalCase(f.name);
     if (f.optional || isModelType(f.type)) {
       lines.push(`        ${typeToCsharp(f.type)}? _${fname} = null;`);
@@ -215,7 +216,7 @@ function generateModelCode(m: Model, pkg: string): string {
   lines.push(`        r.BeginObject();`);
   lines.push(`        while (r.HasNextField()) {`);
   lines.push(`            switch (r.ReadFieldName()) {`);
-  for (const f of orderedFields) {
+  for (const f of fields) {
     const fname = toPascalCase(f.name);
     if (f.optional || isModelType(f.type) || isArrayType(f.type) || isRecordType(f.type)) {
       lines.push(`                case "${f.name}": _${fname} = ${readExpr(f.type, "r", f.optional)}; break;`);
@@ -227,7 +228,7 @@ function generateModelCode(m: Model, pkg: string): string {
   lines.push(`            }`);
   lines.push(`        }`);
   lines.push(`        r.EndObject();`);
-  const ctorArgs = orderedFields.map(f => {
+  const ctorArgs = recordFields.map(f => {
     const fname = toPascalCase(f.name);
     if (!f.optional && isModelType(f.type))
       return `${fname}: _${fname}!`;
