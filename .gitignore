@@ -1,0 +1,9 @@
+*.log
+.DS_Store
+.cache/
+*.swp
+*.swo
+*~
+node_modules/
+dist/
+*.tsbuildinfo

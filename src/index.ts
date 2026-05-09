@@ -1,25 +1,22 @@
-import {
-  EmitContext,
-  emitFile,
-  Model,
-  Type,
-} from "@typespec/compiler";
+import { type EmitContext, emitFile, type Model, type Type } from "@typespec/compiler";
 import {
   collectServices,
-  ServiceInfo,
-  BaseEmitterOptions,
-  FieldInfo,
+  type BaseEmitterOptions,
+  type UnionInfo,
+  type UnionVariantInfo,
   extractFields,
   scalarName,
   isArrayType,
   isRecordType,
   isModelType,
+  isUnionType,
+  isScalarVariant,
   arrayElementType,
   recordElementType,
   toPascalCase,
-  toSnakeCase,
   dottedPathToSnakeCase,
   checkAndReportReservedKeywords,
+  safeFieldName,
 } from "@specodec/typespec-emitter-core";
 
 export type EmitterOptions = BaseEmitterOptions;
@@ -30,21 +27,39 @@ function typeToCsharp(type: Type): string {
   const n = scalarName(type);
   if (n) {
     switch (n) {
-      case "string": return "string";
-      case "boolean": return "bool";
-      case "int8": return "byte";
-      case "int16": return "short";
-      case "int32": case "integer": return "int";
-      case "int64": return "long";
-      case "uint8": return "byte";
-      case "uint16": return "ushort";
-      case "uint32": return "uint";
-      case "uint64": return "ulong";
-      case "float32": return "float";
-      case "float64": case "float": case "decimal": return "double";
-      case "bytes": return "byte[]";
+      case "string":
+        return "string";
+      case "boolean":
+        return "bool";
+      case "int8":
+        return "byte";
+      case "int16":
+        return "short";
+      case "int32":
+      case "integer":
+        return "int";
+      case "int64":
+        return "long";
+      case "uint8":
+        return "byte";
+      case "uint16":
+        return "ushort";
+      case "uint32":
+        return "uint";
+      case "uint64":
+        return "ulong";
+      case "float32":
+        return "float";
+      case "float64":
+      case "float":
+      case "decimal":
+        return "double";
+      case "bytes":
+        return "byte[]";
     }
   }
+  if (type.kind === "Enum") return "string";
+  if (isUnionType(type)) return (type as any).name || "object";
   if (type.kind === "Model") return (type as Model).name || "object";
   return "object";
 }
@@ -55,27 +70,57 @@ function defaultValue(type: Type): string {
   const n = scalarName(type);
   if (n) {
     switch (n) {
-      case "string": return '""';
-      case "boolean": return "false";
-      case "int8": case "int16": case "int32": case "integer": return "0";
-      case "int64": return "0L";
-      case "uint8": case "uint16": return "0";
-      case "uint32": return "0u";
-      case "uint64": return "0UL";
-      case "float32": return "0f";
-      case "float64": case "float": case "decimal": return "0.0";
-      case "bytes": return "Array.Empty<byte>()";
+      case "string":
+        return '""';
+      case "boolean":
+        return "false";
+      case "int8":
+      case "int16":
+      case "int32":
+      case "integer":
+        return "0";
+      case "int64":
+        return "0L";
+      case "uint8":
+      case "uint16":
+        return "0";
+      case "uint32":
+        return "0u";
+      case "uint64":
+        return "0UL";
+      case "float32":
+        return "0f";
+      case "float64":
+      case "float":
+      case "decimal":
+        return "0.0";
+      case "bytes":
+        return "Array.Empty<byte>()";
     }
   }
+  if (type.kind === "Enum") return '"";';
+  if (isUnionType(type)) return `new ${(type as any).name}Undefined()`;
   return "null!";
 }
 
 function isCSharpValueType(type: Type): boolean {
   const n = scalarName(type);
-  return n === "boolean"
-    || n === "int8" || n === "int16" || n === "int32" || n === "int64" || n === "integer"
-    || n === "uint8" || n === "uint16" || n === "uint32" || n === "uint64"
-    || n === "float32" || n === "float64" || n === "float" || n === "decimal";
+  return (
+    n === "boolean" ||
+    n === "int8" ||
+    n === "int16" ||
+    n === "int32" ||
+    n === "int64" ||
+    n === "integer" ||
+    n === "uint8" ||
+    n === "uint16" ||
+    n === "uint32" ||
+    n === "uint64" ||
+    n === "float32" ||
+    n === "float64" ||
+    n === "float" ||
+    n === "decimal"
+  );
 }
 
 function writeExpr(expr: string, type: Type, w: string): string {
@@ -98,21 +143,41 @@ function writeExpr(expr: string, type: Type, w: string): string {
   const n = scalarName(type);
   if (n) {
     switch (n) {
-      case "string": return `${w}.WriteString(${expr});`;
-      case "boolean": return `${w}.WriteBool(${expr});`;
-      case "int8": return `${w}.WriteInt32((sbyte)${expr});`;
-      case "int16": return `${w}.WriteInt32(${expr});`;
-      case "int32": case "integer": return `${w}.WriteInt32(${expr});`;
-      case "int64": return `${w}.WriteInt64(${expr});`;
-      case "uint8": case "uint16": return `${w}.WriteUint32(${expr});`;
-      case "uint32": return `${w}.WriteUint32(${expr});`;
-      case "uint64": return `${w}.WriteUint64(${expr});`;
-      case "float32": return `${w}.WriteFloat32(${expr});`;
-      case "float64": case "float": case "decimal": return `${w}.WriteFloat64(${expr});`;
-      case "bytes": return `${w}.WriteBytes(${expr});`;
+      case "string":
+        return `${w}.WriteString(${expr});`;
+      case "boolean":
+        return `${w}.WriteBool(${expr});`;
+      case "int8":
+        return `${w}.WriteInt32((sbyte)${expr});`;
+      case "int16":
+        return `${w}.WriteInt32(${expr});`;
+      case "int32":
+      case "integer":
+        return `${w}.WriteInt32(${expr});`;
+      case "int64":
+        return `${w}.WriteInt64(${expr});`;
+      case "uint8":
+      case "uint16":
+        return `${w}.WriteUint32(${expr});`;
+      case "uint32":
+        return `${w}.WriteUint32(${expr});`;
+      case "uint64":
+        return `${w}.WriteUint64(${expr});`;
+      case "float32":
+        return `${w}.WriteFloat32(${expr});`;
+      case "float64":
+      case "float":
+      case "decimal":
+        return `${w}.WriteFloat64(${expr});`;
+      case "bytes":
+        return `${w}.WriteBytes(${expr});`;
     }
   }
-  if (type.kind === "Model" && (type as Model).name) return `${(type as Model).name}Methods.Write${(type as Model).name}(${w}, ${expr});`;
+  if (isUnionType(type))
+    return `${(type as any).name}Methods.Write${(type as any).name}(${w}, ${expr});`;
+  if (type.kind === "Model" && (type as Model).name)
+    return `${(type as Model).name}Methods.Write${(type as Model).name}(${w}, ${expr});`;
+  if (type.kind === "Enum") return `${w}.WriteString(${expr}.ToString());`;
   return `// TODO: unknown type`;
 }
 
@@ -130,35 +195,54 @@ function readExpr(type: Type, r: string, optional?: boolean): string {
   const n = scalarName(type);
   if (n) {
     switch (n) {
-      case "string": return `${r}.ReadString()`;
-      case "boolean": return `${r}.ReadBool()`;
-      case "int8": return `(byte)${r}.ReadInt32()`;
-      case "int16": return `(short)${r}.ReadInt32()`;
-      case "int32": case "integer": return `${r}.ReadInt32()`;
-      case "int64": return `${r}.ReadInt64()`;
-      case "uint8": return `(byte)${r}.ReadUint32()`;
-      case "uint16": return `(ushort)${r}.ReadUint32()`;
-      case "uint32": return `${r}.ReadUint32()`;
-      case "uint64": return `${r}.ReadUint64()`;
-      case "float32": return `${r}.ReadFloat32()`;
-      case "float64": case "float": case "decimal": return `${r}.ReadFloat64()`;
-      case "bytes": return `${r}.ReadBytes()`;
+      case "string":
+        return `${r}.ReadString()`;
+      case "boolean":
+        return `${r}.ReadBool()`;
+      case "int8":
+        return `(byte)${r}.ReadInt32()`;
+      case "int16":
+        return `(short)${r}.ReadInt32()`;
+      case "int32":
+      case "integer":
+        return `${r}.ReadInt32()`;
+      case "int64":
+        return `${r}.ReadInt64()`;
+      case "uint8":
+        return `(byte)${r}.ReadUint32()`;
+      case "uint16":
+        return `(ushort)${r}.ReadUint32()`;
+      case "uint32":
+        return `${r}.ReadUint32()`;
+      case "uint64":
+        return `${r}.ReadUint64()`;
+      case "float32":
+        return `${r}.ReadFloat32()`;
+      case "float64":
+      case "float":
+      case "decimal":
+        return `${r}.ReadFloat64()`;
+      case "bytes":
+        return `${r}.ReadBytes()`;
     }
   }
+  if (type.kind === "Enum") return `${r}.ReadString()`;
+  if (isUnionType(type)) return `${(type as any).name}Methods.${(type as any).name}Codec.Decode(${r})`;
   if (type.kind === "Model" && (type as Model).name) {
     const modelType = typeToCsharp(type);
     const decodeCall = `${(type as Model).name}Methods.${(type as Model).name}Codec.Decode(${r})`;
-    if (optional) return `${r}.IsNull() ? ((Func<${modelType}?>)(() => { ${r}.ReadNull(); return null; }))() : ${decodeCall}`;
+    if (optional)
+      return `${r}.IsNull() ? ((Func<${modelType}?>)(() => { ${r}.ReadNull(); return null; }))() : ${decodeCall}`;
     return decodeCall;
   }
   return `default!`;
 }
 
-function generateModelCode(m: Model, pkg: string): string {
+function generateModelCode(m: Model, _pkg: string): string {
   const fields = extractFields(m);
-  const optionalFields = fields.filter(f => f.optional);
-  const requiredCount = fields.filter(f => !f.optional).length;
-  const recordFields = [...fields.filter(f => !f.optional), ...fields.filter(f => f.optional)];
+  const optionalFields = fields.filter((f) => f.optional);
+  const requiredCount = fields.filter((f) => !f.optional).length;
+  const recordFields = [...fields.filter((f) => !f.optional), ...fields.filter((f) => f.optional)];
   const lines: string[] = [];
 
   if (fields.length === 0) {
@@ -183,7 +267,7 @@ function generateModelCode(m: Model, pkg: string): string {
   if (optionalFields.length > 0) {
     lines.push(`    var fieldCount = ${requiredCount};`);
     for (const f of optionalFields) {
-      const fname = toPascalCase(f.name);
+      const fname = safeFieldName("csharp", toPascalCase(f.name));
       lines.push(`    if (obj.${fname} != null) fieldCount++;`);
     }
     lines.push(`    w.BeginObject(fieldCount);`);
@@ -229,12 +313,13 @@ function generateModelCode(m: Model, pkg: string): string {
   lines.push(`            }`);
   lines.push(`        }`);
   lines.push(`        r.EndObject();`);
-  const ctorArgs = recordFields.map(f => {
-    const fname = toPascalCase(f.name);
-    if (!f.optional && isModelType(f.type))
-      return `${fname}: _${fname}!`;
-    return `${fname}: _${fname}`;
-  }).join(", ");
+  const ctorArgs = recordFields
+    .map((f) => {
+      const fname = toPascalCase(f.name);
+      if (!f.optional && isModelType(f.type)) return `${fname}: _${fname}!`;
+      return `${fname}: _${fname}`;
+    })
+    .join(", ");
   lines.push(`        return new ${m.name}(${ctorArgs});`);
   lines.push(`    }`);
   lines.push(`);`);
@@ -242,6 +327,54 @@ function generateModelCode(m: Model, pkg: string): string {
 
   return lines.join("\n");
 }
+
+function generateUnionCode(u: UnionInfo, L: string[]): void {
+  const unionName = u.name;
+
+  L.push(`public abstract record ${unionName};`);
+  L.push(``);
+  for (const v of u.variants) {
+    const pascalName = toPascalCase(v.name);
+    const csType = typeToCsharp(v.type);
+    L.push(`public record ${unionName}${pascalName}(${csType} Value) : ${unionName};`);
+  }
+  L.push(`public record ${unionName}Undefined() : ${unionName};`);
+  L.push(``);
+
+  L.push(`public static class ${unionName}Methods {`);
+  L.push(`public static void Write${unionName}(SpecWriter w, ${unionName} obj) {`);
+  L.push(`    w.BeginObject(1);`);
+  L.push(`    switch (obj) {`);
+  for (const v of u.variants) {
+    const pascalName = toPascalCase(v.name);
+    L.push(`        case ${unionName}${pascalName} v: w.WriteField("${v.name}"); ${writeExpr("v.Value", v.type, "w")} break;`);
+  }
+  L.push(`        _ => throw new Exception("cannot encode Undefined for ${unionName}")`);
+  L.push(`    }`);
+  L.push(`    w.EndObject();`);
+  L.push(`}`);
+
+  L.push(``);
+  L.push(`public static ${unionName} Decode${unionName}(SpecReader r) {`);
+  L.push(`    r.BeginObject();`);
+  L.push(`    if (!r.HasNextField()) { r.EndObject(); throw new Exception("empty union"); }`);
+  L.push(`    var field = r.ReadFieldName();`);
+  L.push(`    ${unionName} result = field switch {`);
+  for (const v of u.variants) {
+    L.push(`        "${v.name}" => new ${unionName}${toPascalCase(v.name)}(${readExpr(v.type, "r")}),`);
+  }
+  L.push(`        _ => throw new Exception($"unknown variant {field}")`);
+  L.push(`    };`);
+  L.push(`    while (r.HasNextField()) { r.ReadFieldName(); r.Skip(); }`);
+  L.push(`    r.EndObject();`);
+  L.push(`    return result;`);
+  L.push(`}`);
+
+  L.push(``);
+  L.push(`public static readonly SpecCodec<${unionName}> ${unionName}Codec = new(Write${unionName}, Decode${unionName});`);
+  L.push(`} // ${unionName}Methods`);
+}
+
 
 export async function $onEmit(context: EmitContext<EmitterOptions>) {
   const program = context.program;
@@ -266,6 +399,10 @@ export async function $onEmit(context: EmitContext<EmitterOptions>) {
     for (const m of svc.models) {
       if (!m.name) continue;
       lines.push(generateModelCode(m, pkg));
+      lines.push(``);
+    }
+    for (const u of svc.unions) {
+      generateUnionCode(u, lines);
       lines.push(``);
     }
     const fileName = `${dottedPathToSnakeCase(svc.serviceName)}_types.cs`;
