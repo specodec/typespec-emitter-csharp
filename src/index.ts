@@ -22,8 +22,8 @@ import {
 export type EmitterOptions = BaseEmitterOptions;
 
 function typeToCsharp(type: Type): string {
-  if (isArrayType(type)) return `List<${typeToCsharp(arrayElementType(type))}>`;
-  if (isRecordType(type)) return `Dictionary<string, ${typeToCsharp(recordElementType(type))}>`;
+  if (isArrayType(type)) return `List<${typeToCsharp(arrayElementType(type)!)}>`;
+  if (isRecordType(type)) return `Dictionary<string, ${typeToCsharp(recordElementType(type)!)}>`;
   const n = scalarName(type);
   if (n) {
     switch (n) {
@@ -65,8 +65,8 @@ function typeToCsharp(type: Type): string {
 }
 
 function defaultValue(type: Type): string {
-  if (isArrayType(type)) return `new List<${typeToCsharp(arrayElementType(type))}>()`;
-  if (isRecordType(type)) return `new Dictionary<string, ${typeToCsharp(recordElementType(type))}>()`;
+  if (isArrayType(type)) return `new List<${typeToCsharp(arrayElementType(type)!)}>()`;
+  if (isRecordType(type)) return `new Dictionary<string, ${typeToCsharp(recordElementType(type)!)}>()`;
   const n = scalarName(type);
   if (n) {
     switch (n) {
@@ -125,7 +125,7 @@ function isCSharpValueType(type: Type): boolean {
 
 function writeExpr(expr: string, type: Type, w: string): string {
   if (isArrayType(type)) {
-    const elem = arrayElementType(type);
+    const elem = arrayElementType(type)!;
     return [
       `${w}.BeginArray(${expr}.Count);`,
       `foreach (var item in ${expr}) { ${w}.NextElement(); ${writeExpr("item", elem, w)} }`,
@@ -133,7 +133,7 @@ function writeExpr(expr: string, type: Type, w: string): string {
     ].join("\n        ");
   }
   if (isRecordType(type)) {
-    const elem = recordElementType(type);
+    const elem = recordElementType(type)!;
     return [
       `${w}.BeginObject(${expr}.Count);`,
       `foreach (var kv in ${expr}) { ${w}.WriteField(kv.Key); ${writeExpr("kv.Value", elem, w)} }`,
@@ -183,12 +183,12 @@ function writeExpr(expr: string, type: Type, w: string): string {
 
 function readExpr(type: Type, r: string, optional?: boolean): string {
   if (isArrayType(type)) {
-    const elem = arrayElementType(type);
+    const elem = arrayElementType(type)!;
     const csElem = typeToCsharp(elem);
     return `((Func<List<${csElem}>>)(() => { var list = new List<${csElem}>(); ${r}.BeginArray(); while (${r}.HasNextElement()) list.Add(${readExpr(elem, r)}); ${r}.EndArray(); return list; }))()`;
   }
   if (isRecordType(type)) {
-    const elem = recordElementType(type);
+    const elem = recordElementType(type)!;
     const csElem = typeToCsharp(elem);
     return `((Func<Dictionary<string, ${csElem}>>)(() => { var map = new Dictionary<string, ${csElem}>(); ${r}.BeginObject(); while (${r}.HasNextField()) { var key = ${r}.ReadFieldName(); map[key] = ${readExpr(elem, r)}; } ${r}.EndObject(); return map; }))()`;
   }
