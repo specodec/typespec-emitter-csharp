@@ -349,7 +349,7 @@ function generateUnionCode(u: UnionInfo, L: string[]): void {
     const pascalName = toPascalCase(v.name);
     L.push(`        case ${unionName}${pascalName} v: w.WriteField("${v.name}"); ${writeExpr("v.Value", v.type, "w")} break;`);
   }
-  L.push(`        _ => throw new Exception("cannot encode Undefined for ${unionName}")`);
+  L.push(`        default: throw new Exception("cannot encode Undefined for ${unionName}");`);
   L.push(`    }`);
   L.push(`    w.EndObject();`);
   L.push(`}`);
