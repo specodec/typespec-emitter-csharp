@@ -15,6 +15,7 @@ import {
   recordElementType,
   toPascalCase,
   dottedPathToSnakeCase,
+  dottedPathToPascalCase,
   checkAndReportReservedKeywords,
   safeFieldName,
 } from "@specodec/typespec-emitter-core";
@@ -405,7 +406,7 @@ export async function $onEmit(context: EmitContext<EmitterOptions>) {
       generateUnionCode(u, lines);
       lines.push(``);
     }
-    const fileName = `${dottedPathToSnakeCase(svc.serviceName)}_types.cs`;
+    const fileName = `${dottedPathToPascalCase(svc.serviceName)}Types.cs`;
     await emitFile(program, { path: `${outputDir}/${fileName}`, content: lines.join("\n") });
   }
 }

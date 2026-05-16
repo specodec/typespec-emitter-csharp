@@ -1,5 +1,5 @@
 import { emitFile } from "@typespec/compiler";
-import { collectServices, extractFields, scalarName, isArrayType, isRecordType, isModelType, isUnionType, arrayElementType, recordElementType, toPascalCase, dottedPathToSnakeCase, checkAndReportReservedKeywords, safeFieldName, } from "@specodec/typespec-emitter-core";
+import { collectServices, extractFields, scalarName, isArrayType, isRecordType, isModelType, isUnionType, arrayElementType, recordElementType, toPascalCase, dottedPathToPascalCase, checkAndReportReservedKeywords, safeFieldName, } from "@specodec/typespec-emitter-core";
 function typeToCsharp(type) {
     if (isArrayType(type))
         return `List<${typeToCsharp(arrayElementType(type))}>`;
@@ -385,7 +385,7 @@ export async function $onEmit(context) {
             generateUnionCode(u, lines);
             lines.push(``);
         }
-        const fileName = `${dottedPathToSnakeCase(svc.serviceName)}_types.cs`;
+        const fileName = `${dottedPathToPascalCase(svc.serviceName)}Types.cs`;
         await emitFile(program, { path: `${outputDir}/${fileName}`, content: lines.join("\n") });
     }
 }
